@@ -1,0 +1,13 @@
+name: Ejemplo CI
+
+on:
+  push:
+    branches: [ "master" ]   # tu rama se llama master (mira el mensaje de git init)
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mostrar saludo
+        run: echo "Hola desde GitHub Actions"
+
