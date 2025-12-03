@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path = "~/.kube/config"
+  config_path = "/Users/juanantonio/.kube/config"
 }
 
 # 1) Crear/Eliminar el cluster de kind
@@ -42,17 +42,24 @@ resource "kubernetes_persistent_volume" "mariadb_pv" {
     capacity = {
       storage = "1Gi"
     }
+
     access_modes = ["ReadWriteOnce"]
 
+    storage_class_name = "standard"
     persistent_volume_reclaim_policy = "Retain"
 
-    host_path {
-      path = "/data/k8s/mariadb"  # crea estos dirs en tu host
+    persistent_volume_source {
+      host_path {
+        path = "/Users/juanantonio/k8s-data/mariadb"
+      }
     }
   }
 
   depends_on = [kubernetes_namespace.analytics]
 }
+
+
+
 
 resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
   metadata {
@@ -61,7 +68,10 @@ resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
   }
 
   spec {
-    access_modes = ["ReadWriteOnce"]
+    access_modes       = ["ReadWriteOnce"]
+
+    # MUY IMPORTANTE: desactivar StorageClass por defecto
+    storage_class_name = ""
 
     resources {
       requests = {
@@ -69,8 +79,11 @@ resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
       }
     }
 
+    # Forzamos a usar el PV que creamos a mano
     volume_name = kubernetes_persistent_volume.mariadb_pv.metadata[0].name
   }
+
+  wait_until_bound = true
 }
 
 resource "kubernetes_persistent_volume" "matomo_pv" {
@@ -82,16 +95,24 @@ resource "kubernetes_persistent_volume" "matomo_pv" {
     capacity = {
       storage = "1Gi"
     }
+
     access_modes = ["ReadWriteOnce"]
+
+    storage_class_name = "standard"
     persistent_volume_reclaim_policy = "Retain"
 
-    host_path {
-      path = "/data/k8s/matomo"
+    persistent_volume_source {
+      host_path {
+        path = "/Users/juanantonio/k8s-data/matomo"
+      }
     }
   }
 
   depends_on = [kubernetes_namespace.analytics]
 }
+
+
+
 
 resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
   metadata {
@@ -100,7 +121,10 @@ resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
   }
 
   spec {
-    access_modes = ["ReadWriteOnce"]
+    access_modes       = ["ReadWriteOnce"]
+
+    # También sin StorageClass
+    storage_class_name = ""
 
     resources {
       requests = {
@@ -110,7 +134,10 @@ resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
 
     volume_name = kubernetes_persistent_volume.matomo_pv.metadata[0].name
   }
+
+  wait_until_bound = true
 }
+
 
 # 4) Deployment de MariaDB
 resource "kubernetes_deployment" "mariadb" {
