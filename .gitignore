@@ -1,1 +1,18 @@
 .github/workflows/token_dockerhub
+# Directorios locales de Terraform
+**/.terraform/*
+# Ficheros de estado
+*.tfstate
+*.tfstate.*
+# Logs de errores
+crash.log
+crash.*.log
+
+# Ficheros de variables (suelen tener secretos)
+*.tfvars
+*.auto.tfvars
+# Ficheros de plan
+*.tfplan
+
+# Lockfile de Terraform (si no quieres versionarlo)
+.terraform.lock.hcl
