@@ -23,7 +23,7 @@ jobs:
         run: |
           docker build \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/matomo-custom:latest \
-            docker/matomo
+            ejercicio-2/Docker/matomo
 
       - name: Push Matomo image
         run: |
