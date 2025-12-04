@@ -4,11 +4,16 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
 provider "kubernetes" {
-  config_path = "/Users/juanantonio/.kube/config"
+  config_path    = "~/.kube/config"
+  config_context = "kind-matomo"
 }
 
 # 1) Crear/Eliminar el cluster de kind
@@ -36,6 +41,10 @@ resource "kubernetes_namespace" "analytics" {
 resource "kubernetes_persistent_volume" "mariadb_pv" {
   metadata {
     name = "mariadb-pv"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 
   spec {
@@ -67,6 +76,10 @@ resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
     namespace = kubernetes_namespace.analytics.metadata[0].name
   }
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   spec {
     access_modes       = ["ReadWriteOnce"]
 
@@ -89,6 +102,10 @@ resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
 resource "kubernetes_persistent_volume" "matomo_pv" {
   metadata {
     name = "matomo-pv"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 
   spec {
@@ -118,6 +135,10 @@ resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
   metadata {
     name      = "matomo-pvc"
     namespace = kubernetes_namespace.analytics.metadata[0].name
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 
   spec {
@@ -280,6 +301,18 @@ resource "kubernetes_deployment" "matomo" {
           env {
             name  = "MATOMO_DATABASE_DBNAME"
             value = var.db_name
+          }
+          env {
+            name  = "PHP_MEMORY_LIMIT"
+            value = var.php_memory_limit
+          }
+          env {
+            name  = "PHP_UPLOAD_MAX_FILESIZE"
+            value = var.php_upload_max_filesize
+          }
+          env {
+            name  = "PHP_POST_MAX_SIZE"
+            value = var.php_post_max_size
           }
 
           port {
