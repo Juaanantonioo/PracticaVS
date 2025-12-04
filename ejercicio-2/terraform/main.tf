@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.0"
+
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -11,21 +13,25 @@ terraform {
   }
 }
 
-provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "kind-matomo"
-}
-
 # 1) Crear/Eliminar el cluster de kind
 resource "null_resource" "kind_cluster" {
   provisioner "local-exec" {
-    command = "kind create cluster --name matomo --config kind-config.yaml"
+    command = "kind create cluster --name matomo --config kind-config.yaml 2>/dev/null || echo 'Cluster ya existe'"
+  }
+
+  provisioner "local-exec" {
+    command = "for i in {1..30}; do kubectl cluster-info --context kind-matomo 2>/dev/null && break || sleep 2; done"
   }
 
   provisioner "local-exec" {
     when    = destroy
     command = "kind delete cluster --name matomo"
   }
+}
+
+provider "kubernetes" {
+  config_path    = "~/.kube/config"
+  config_context = "kind-matomo"
 }
 
 # 2) Namespace
@@ -35,6 +41,25 @@ resource "kubernetes_namespace" "analytics" {
   }
 
   depends_on = [null_resource.kind_cluster]
+}
+
+# 3) Secret para las credenciales de la base de datos
+resource "kubernetes_secret" "db_credentials" {
+  metadata {
+    name      = "db-credentials"
+    namespace = kubernetes_namespace.analytics.metadata[0].name
+  }
+
+  type = "Opaque"
+
+  data = {
+    MYSQL_ROOT_PASSWORD = base64encode(var.db_root_password)
+    MYSQL_DATABASE      = base64encode(var.db_name)
+    MYSQL_USER          = base64encode(var.db_user)
+    MYSQL_PASSWORD      = base64encode(var.db_password)
+  }
+
+  depends_on = [kubernetes_namespace.analytics]
 }
 
 # 3) Volúmenes persistentes (hostPath) -> los datos quedan en el host aunque borres el cluster
@@ -192,20 +217,43 @@ resource "kubernetes_deployment" "mariadb" {
           image = "mariadb:latest"
 
           env {
-            name  = "MYSQL_ROOT_PASSWORD"
-            value = var.db_root_password
+            name = "MYSQL_ROOT_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_ROOT_PASSWORD"
+              }
+            }
           }
+
           env {
-            name  = "MYSQL_DATABASE"
-            value = var.db_name
+            name = "MYSQL_DATABASE"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_DATABASE"
+              }
+            }
           }
+
           env {
-            name  = "MYSQL_USER"
-            value = var.db_user
+            name = "MYSQL_USER"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_USER"
+              }
+            }
           }
+
           env {
-            name  = "MYSQL_PASSWORD"
-            value = var.db_password
+            name = "MYSQL_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_PASSWORD"
+              }
+            }
           }
 
           port {
@@ -227,6 +275,8 @@ resource "kubernetes_deployment" "mariadb" {
       }
     }
   }
+
+  depends_on = [kubernetes_secret.db_credentials]
 }
 
 resource "kubernetes_service" "mariadb" {
@@ -290,18 +340,37 @@ resource "kubernetes_deployment" "matomo" {
             name  = "MATOMO_DATABASE_TABLES_PREFIX"
             value = "matomo_"
           }
+
           env {
-            name  = "MATOMO_DATABASE_USERNAME"
-            value = var.db_user
+            name = "MATOMO_DATABASE_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_USER"
+              }
+            }
           }
+
           env {
-            name  = "MATOMO_DATABASE_PASSWORD"
-            value = var.db_password
+            name = "MATOMO_DATABASE_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_PASSWORD"
+              }
+            }
           }
+
           env {
-            name  = "MATOMO_DATABASE_DBNAME"
-            value = var.db_name
+            name = "MATOMO_DATABASE_DBNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.db_credentials.metadata[0].name
+                key  = "MYSQL_DATABASE"
+              }
+            }
           }
+
           env {
             name  = "PHP_MEMORY_LIMIT"
             value = var.php_memory_limit
@@ -334,6 +403,8 @@ resource "kubernetes_deployment" "matomo" {
       }
     }
   }
+
+  depends_on = [kubernetes_secret.db_credentials]
 }
 
 # 6) Service de Matomo (NodePort 30081 -> mapeado al 8081 del host en kind-config.yaml)
