@@ -1,0 +1,10 @@
+# kind-cluster.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30085   # puerto del NodePort en el nodo kind
+        hostPort: 8085         # puerto en tu máquina host
+        protocol: TCP
+  - role: worker
