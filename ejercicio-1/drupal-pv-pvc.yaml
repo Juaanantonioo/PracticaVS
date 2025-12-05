@@ -3,7 +3,7 @@ kind: PersistentVolume
 metadata: 
   name: pv-drupal-sites
 spec:
-  storageClassName: standard   # <-- AÑADIDO
+  storageClassName: standard   
   capacity:
     storage: 1Gi
   accessModes:
@@ -16,7 +16,7 @@ kind: PersistentVolumeClaim
 metadata: 
   name: pvc-drupal-sites
 spec:
-  storageClassName: standard   # <-- AÑADIDO
+  storageClassName: standard  
   accessModes:
     - ReadWriteOnce
   resources:
