@@ -6,26 +6,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.0"
-    }
-  }
-}
-
-# 1) Crear/Eliminar el cluster de kind
-resource "null_resource" "kind_cluster" {
-  provisioner "local-exec" {
-    command = "kind create cluster --name matomo --config kind-config.yaml 2>/dev/null || echo 'Cluster ya existe'"
-  }
-
-  provisioner "local-exec" {
-    command = "for i in {1..30}; do kubectl cluster-info --context kind-matomo 2>/dev/null && break || sleep 2; done"
-  }
-
-  provisioner "local-exec" {
-    when    = destroy
-    command = "kind delete cluster --name matomo"
   }
 }
 
@@ -34,16 +14,14 @@ provider "kubernetes" {
   config_context = "kind-matomo"
 }
 
-# 2) Namespace
+# 1) Namespace
 resource "kubernetes_namespace" "analytics" {
   metadata {
     name = "analytics"
   }
-
-  depends_on = [null_resource.kind_cluster]
 }
 
-# 3) Secret para las credenciales de la base de datos
+# 2) Secret para las credenciales de la base de datos
 resource "kubernetes_secret" "db_credentials" {
   metadata {
     name      = "db-credentials"
@@ -53,10 +31,10 @@ resource "kubernetes_secret" "db_credentials" {
   type = "Opaque"
 
   data = {
-    MYSQL_ROOT_PASSWORD = base64encode(var.db_root_password)
-    MYSQL_DATABASE      = base64encode(var.db_name)
-    MYSQL_USER          = base64encode(var.db_user)
-    MYSQL_PASSWORD      = base64encode(var.db_password)
+    MYSQL_ROOT_PASSWORD = var.db_root_password
+    MYSQL_DATABASE      = var.db_name
+    MYSQL_USER          = var.db_user
+    MYSQL_PASSWORD      = var.db_password
   }
 
   depends_on = [kubernetes_namespace.analytics]
@@ -88,12 +66,7 @@ resource "kubernetes_persistent_volume" "mariadb_pv" {
       }
     }
   }
-
-  depends_on = [kubernetes_namespace.analytics]
 }
-
-
-
 
 resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
   metadata {
@@ -149,12 +122,7 @@ resource "kubernetes_persistent_volume" "matomo_pv" {
       }
     }
   }
-
-  depends_on = [kubernetes_namespace.analytics]
 }
-
-
-
 
 resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
   metadata {
