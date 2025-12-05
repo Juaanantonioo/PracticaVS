@@ -50,3 +50,19 @@ spec:
           persistentVolumeClaim:
             claimName: pvc-drupal-sites 
 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drupal-service
+spec:
+  type: NodePort
+  selector:
+    app: drupal
+  ports:
+    - name: http
+      port: 8085
+      targetPort: 80
+      nodePort: 30085
+      protocol: TCP
+
