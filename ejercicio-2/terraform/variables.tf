@@ -1,6 +1,6 @@
 variable "db_name" {
   type        = string
-  default     = "matomo"
+  default     = "matomodb"
   description = "Nombre de la base de datos de Matomo"
 }
 
