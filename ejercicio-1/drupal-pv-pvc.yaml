@@ -17,6 +17,7 @@ metadata:
   name: pvc-drupal-sites
 spec:
   storageClassName: standard  
+  volumeName: pv-drupal-sites
   accessModes:
     - ReadWriteOnce
   resources:

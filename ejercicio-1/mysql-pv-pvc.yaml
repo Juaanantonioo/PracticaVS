@@ -17,6 +17,7 @@ metadata:
   name: pvc-mysql
 spec:
   storageClassName: standard   
+  volumeName: pv-mysql
   accessModes:
     - ReadWriteOnce
   resources:
