@@ -40,6 +40,20 @@ resource "kubernetes_secret" "db_credentials" {
   depends_on = [kubernetes_namespace.analytics]
 }
 
+# ConfigMap con script SQL que MariaDB ejecutará al inicializar
+resource "kubernetes_config_map" "mariadb_init" {
+  metadata {
+    name      = "mariadb-init"
+    namespace = kubernetes_namespace.analytics.metadata[0].name
+  }
+
+  data = {
+    "init.sql" = "SET SESSION sql_mode='';"
+  }
+
+  depends_on = [kubernetes_namespace.analytics]
+}
+
 # 3) Volúmenes persistentes (hostPath) -> los datos quedan en el host aunque borres el cluster
 resource "kubernetes_persistent_volume" "mariadb_pv" {
   metadata {
@@ -66,7 +80,12 @@ resource "kubernetes_persistent_volume" "mariadb_pv" {
       }
     }
   }
+
+  depends_on = [kubernetes_namespace.analytics]
 }
+
+
+
 
 resource "kubernetes_persistent_volume_claim" "mariadb_pvc" {
   metadata {
@@ -122,7 +141,12 @@ resource "kubernetes_persistent_volume" "matomo_pv" {
       }
     }
   }
+
+  depends_on = [kubernetes_namespace.analytics]
 }
+
+
+
 
 resource "kubernetes_persistent_volume_claim" "matomo_pvc" {
   metadata {
@@ -232,6 +256,11 @@ resource "kubernetes_deployment" "mariadb" {
             name       = "mariadb-data"
             mount_path = "/var/lib/mysql"
           }
+
+          volume_mount {
+            name       = "init-scripts"
+            mount_path = "/docker-entrypoint-initdb.d"
+          }
         }
 
         volume {
@@ -240,11 +269,18 @@ resource "kubernetes_deployment" "mariadb" {
             claim_name = kubernetes_persistent_volume_claim.mariadb_pvc.metadata[0].name
           }
         }
+
+        volume {
+          name = "init-scripts"
+          config_map {
+            name = kubernetes_config_map.mariadb_init.metadata[0].name
+          }
+        }
       }
     }
   }
 
-  depends_on = [kubernetes_secret.db_credentials]
+  depends_on = [kubernetes_config_map.mariadb_init]
 }
 
 resource "kubernetes_service" "mariadb" {
